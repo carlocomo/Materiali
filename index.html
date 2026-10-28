@@ -96,7 +96,7 @@ function parseNumero(parola) {
 
 function analizza(testo) {
   let t = testo.toLowerCase()
-    .replace(/\b(ho usato|ho messo|ho montato|ho utilizzato|ho consumato|servono|serve|poi|ancora|inoltre)\b/g, ",")
+    .replace(/\b(allora|dunque|ehm|eh|mh|uhm|cioè|praticamente|ok|okay|va bene|ho usato|ho messo|ho montato|ho utilizzato|ho consumato|servono|serve|poi|ancora|inoltre)\b/g, ",")
     .replace(/\be\b/g, ",")
     .replace(/\n/g, ",");
   const pezzi = t.split(/[,;.]+/).map(p => p.trim()).filter(p => p.length > 1);
