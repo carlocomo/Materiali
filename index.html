@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Materiali">
+<title>Materiali</title>
+<style>
+  :root { --blu:#0a84ff; --verde:#30d158; --rosso:#ff453a; --bg:#0f1115; --card:#1a1d24; --testo:#f2f4f8; --grigio:#8b93a1; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { margin:0; padding:env(safe-area-inset-top) 16px 40px; font-family:-apple-system,Helvetica,Arial,sans-serif; background:var(--bg); color:var(--testo); }
+  header { text-align:center; padding:22px 0 8px; }
+  header h1 { margin:0; font-size:26px; letter-spacing:.3px; }
+  header p { margin:4px 0 0; color:var(--grigio); font-size:14px; }
+  .card { background:var(--card); border-radius:16px; padding:14px; margin-top:14px; }
+  label { display:block; font-size:12px; color:var(--grigio); text-transform:uppercase; letter-spacing:1px; margin-bottom:6px; }
+  input, textarea { width:100%; background:#10131a; color:var(--testo); border:1px solid #2a2f3a; border-radius:12px; padding:14px; font-size:17px; font-family:inherit; }
+  textarea { min-height:110px; resize:none; }
+  .suggerimento { font-size:13px; color:var(--grigio); margin:8px 2px 0; }
+  button { font-family:inherit; border:none; color:white; border-radius:14px; font-size:18px; font-weight:600; padding:16px; width:100%; margin-top:10px; }
+  #aggiungi { background:var(--blu); }
+  #invia { background:var(--verde); color:#06210f; }
+  #svuota { background:transparent; color:var(--grigio); font-size:15px; font-weight:400; }
+  ul { list-style:none; margin:0; padding:0; }
+  li { display:flex; justify-content:space-between; align-items:center; padding:13px 4px; border-bottom:1px solid #262b35; font-size:17px; }
+  li:last-child { border-bottom:none; }
+  li .qta { color:var(--blu); font-weight:700; margin-right:8px; }
+  li button { width:auto; margin:0; padding:6px 12px; font-size:15px; background:#2a2f3a; color:var(--rosso); border-radius:10px; }
+  .vuota { color:var(--grigio); text-align:center; padding:18px 0; font-size:15px; }
+  .conta { float:right; color:var(--grigio); font-size:13px; text-transform:none; letter-spacing:0; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Materiali</h1>
+  <p>Detta. Controlla. Invia.</p>
+</header>
+
+<div class="card">
+  <label>Lavoro / cliente</label>
+  <input type="text" id="cliente" placeholder="Es. Rossi - Via Roma 12">
+</div>
+
+<div class="card">
+  <label>Cosa hai usato</label>
+  <textarea id="testo" placeholder="Tocca qui, poi tocca il microfono sulla tastiera e parla..."></textarea>
+  <p class="suggerimento">Esempio: cento metri di cavo, due interruttori, una presa comandata</p>
+  <button id="aggiungi">Aggiungi alla lista</button>
+</div>
+
+<div class="card">
+  <label>Lista <span class="conta" id="conta"></span></label>
+  <ul id="lista"></ul>
+</div>
+
+<button id="invia">Invia per mail</button>
+<button id="svuota">Svuota tutto</button>
+
+<script>
+// ====== CAMBIA QUI LA TUA MAIL ======
+const MAIL_DESTINATARIO = "coalizione.01furia@icloud.com";
+// =====================================
+
+const numeriParole = {
+  "un":1,"uno":1,"una":1,"due":2,"tre":3,"quattro":4,"cinque":5,"sei":6,"sette":7,"otto":8,"nove":9,
+  "dieci":10,"undici":11,"dodici":12,"tredici":13,"quattordici":14,"quindici":15,"venti":20,"trenta":30,
+  "quaranta":40,"cinquanta":50,"sessanta":60,"settanta":70,"ottanta":80,"novanta":90,"cento":100,
+  "duecento":200,"trecento":300,"quattrocento":400,"cinquecento":500,"mille":1000
+};
+
+const unitaMap = {
+  "metro":"m","metri":"m","mt":"m","m":"m",
+  "centimetri":"cm","centimetro":"cm","cm":"cm",
+  "pezzi":"pz","pezzo":"pz","pz":"pz",
+  "scatole":"scatole","scatola":"scatola",
+  "rotoli":"rotoli","rotolo":"rotolo",
+  "chili":"kg","chilo":"kg","kg":"kg",
+  "confezioni":"confezioni","confezione":"confezione"
+};
+
+let lista = JSON.parse(localStorage.getItem("listaMateriali") || "[]");
+const campoCliente = document.getElementById("cliente");
+campoCliente.value = localStorage.getItem("clienteMateriali") || "";
+campoCliente.oninput = () => localStorage.setItem("clienteMateriali", campoCliente.value);
+
+function salva() { localStorage.setItem("listaMateriali", JSON.stringify(lista)); }
+
+function parseNumero(parola) {
+  parola = parola.replace(",", ".");
+  if (!isNaN(parseFloat(parola))) return parseFloat(parola);
+  return numeriParole[parola.toLowerCase()] ?? null;
+}
+
+function analizza(testo) {
+  let t = testo.toLowerCase()
+    .replace(/\b(ho usato|ho messo|ho montato|ho utilizzato|ho consumato|servono|serve|poi|ancora|inoltre)\b/g, ",")
+    .replace(/\be\b/g, ",")
+    .replace(/\n/g, ",");
+  const pezzi = t.split(/[,;.]+/).map(p => p.trim()).filter(p => p.length > 1);
+  const risultati = [];
+  pezzi.forEach(p => {
+    const parole = p.split(/\s+/);
+    let qta = null, unita = "", i = 0;
+    const n = parseNumero(parole[0]);
+    if (n !== null) {
+      qta = n; i = 1;
+      if (parole[i] && unitaMap[parole[i]]) { unita = unitaMap[parole[i]]; i++; }
+    }
+    let nome = parole.slice(i).join(" ").replace(/^(di|d')\s*/, "").trim();
+    if (qta === null) { qta = 1; unita = "pz"; }
+    if (!nome) return;
+    risultati.push({ qta, unita, nome });
+  });
+  return risultati;
+}
+
+function disegna() {
+  const ul = document.getElementById("lista");
+  ul.innerHTML = "";
+  document.getElementById("conta").textContent = lista.length ? lista.length + " voci" : "";
+  if (lista.length === 0) {
+    ul.innerHTML = '<div class="vuota">Ancora niente. Detta il primo materiale.</div>';
+    return;
+  }
+  lista.forEach((voce, idx) => {
+    const li = document.createElement("li");
+    li.innerHTML = '<span><span class="qta">' + voce.qta + ' ' + voce.unita + '</span>' + voce.nome + '</span>';
+    const b = document.createElement("button");
+    b.textContent = "Togli";
+    b.onclick = () => { lista.splice(idx, 1); salva(); disegna(); };
+    li.appendChild(b);
+    ul.appendChild(li);
+  });
+}
+
+document.getElementById("aggiungi").onclick = () => {
+  const campo = document.getElementById("testo");
+  const nuove = analizza(campo.value);
+  if (nuove.length === 0) { alert("Scrivi o detta almeno un materiale."); return; }
+  nuove.forEach(v => lista.push(v));
+  campo.value = "";
+  salva(); disegna();
+};
+
+document.getElementById("invia").onclick = () => {
+  if (lista.length === 0) { alert("La lista e' vuota."); return; }
+  const cliente = campoCliente.value || "(non indicato)";
+  const data = new Date().toLocaleDateString("it-IT");
+  let corpo = "Lavoro: " + cliente + "\nData: " + data + "\n\nMateriali usati:\n";
+  lista.forEach(v => { corpo += "- " + v.qta + " " + v.unita + " " + v.nome + "\n"; });
+  window.location.href = "mailto:" + MAIL_DESTINATARIO + "?subject=" + encodeURIComponent("Materiali - " + cliente + " - " + data) + "&body=" + encodeURIComponent(corpo);
+};
+
+document.getElementById("svuota").onclick = () => {
+  if (confirm("Svuotare tutta la lista?")) { lista = []; salva(); disegna(); }
+};
+
+disegna();
+</script>
+</body>
+</html>
